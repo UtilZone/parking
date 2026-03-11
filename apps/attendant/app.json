@@ -13,7 +13,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.utilzone.parking.attendant"
+      "bundleIdentifier": "com.utilzone.parking.attendant",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ParkSmart uses the camera to scan vehicle number plates and photograph cash payments.",
+        "NSPhotoLibraryUsageDescription": "ParkSmart accesses photos to attach cash payment evidence."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,18 +26,19 @@
       },
       "package": "com.utilzone.parking.attendant",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ],
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      "expo-camera",
-      "expo-barcode-scanner",
-      ["expo-notifications", { "icon": "./assets/notification-icon.png" }]
+      ["expo-camera",        { "cameraPermission": "ParkSmart uses the camera to scan number plates and QR codes." }],
+      ["expo-barcode-scanner", { "cameraPermission": "ParkSmart uses the camera to scan exit QR tokens." }],
+      ["expo-image-picker",  { "photosPermission": "ParkSmart accesses photos to attach cash payment evidence.", "cameraPermission": "ParkSmart uses the camera to photograph cash payments." }],
+      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#F59E0B" }]
     ],
     "extra": {
       "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" }

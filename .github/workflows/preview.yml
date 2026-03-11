@@ -1,0 +1,54 @@
+name: PR Preview Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  preview-owner-dashboard:
+    name: Preview — Owner Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: cd apps/owner-dashboard && npm ci
+
+      - name: Inject staging Firebase config
+        run: |
+          cat > apps/owner-dashboard/src/config/firebase.ts << EOF
+          import { initializeApp, getApps } from 'firebase/app';
+          import { getAuth } from 'firebase/auth';
+          import { getFirestore } from 'firebase/firestore';
+          import { getFunctions } from 'firebase/functions';
+          import { getStorage } from 'firebase/storage';
+          const firebaseConfig = {
+            apiKey:            "${{ secrets.FIREBASE_API_KEY }}",
+            authDomain:        "${{ secrets.FIREBASE_PROJECT_ID }}.firebaseapp.com",
+            projectId:         "${{ secrets.FIREBASE_PROJECT_ID }}",
+            storageBucket:     "${{ secrets.FIREBASE_PROJECT_ID }}.appspot.com",
+            messagingSenderId: "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
+            appId:             "${{ secrets.FIREBASE_APP_ID_WEB }}",
+          };
+          const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+          export const auth      = getAuth(app);
+          export const firestore = getFirestore(app);
+          export const functions = getFunctions(app, 'asia-south1');
+          export const storage   = getStorage(app);
+          export default app;
+          EOF
+
+      - run: cd apps/owner-dashboard && npm run build
+
+      - name: Deploy preview channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          target: owner-dashboard
+          expires: 7d

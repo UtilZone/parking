@@ -3,9 +3,9 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage,   connectStorageEmulator }   from 'firebase/storage';
-import { getFunctions, connectFunctionsEmulator }  from 'firebase/functions';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage }   from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -28,12 +28,14 @@ export const firestore  = getFirestore(app);
 export const storage    = getStorage(app);
 export const functions  = getFunctions(app, 'asia-south1');
 
-// Connect to local emulators in development
-if (__DEV__) {
-  const LOCAL_IP = 'localhost'; // use your machine's LAN IP on a real device
-  connectFirestoreEmulator(firestore, LOCAL_IP, 8080);
-  connectStorageEmulator(storage,     LOCAL_IP, 9199);
-  connectFunctionsEmulator(functions, LOCAL_IP, 5001);
-}
+// Uncomment below ONLY for local emulator development.
+// Change LOCAL_IP to your machine's LAN IP when testing on a real device.
+//
+// if (__DEV__) {
+//   const LOCAL_IP = 'YOUR_LAN_IP'; // e.g. '192.168.1.100'
+//   connectFirestoreEmulator(firestore, LOCAL_IP, 8080);
+//   connectStorageEmulator(storage,     LOCAL_IP, 9199);
+//   connectFunctionsEmulator(functions, LOCAL_IP, 5001);
+// }
 
 export default app;

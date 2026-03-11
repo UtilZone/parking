@@ -13,6 +13,7 @@
     "expo-status-bar":               "~1.12.1",
     "expo-notifications":            "~0.28.0",
     "expo-barcode-scanner":          "~13.0.1",
+    "expo-firebase-recaptcha":       "^2.4.0",
     "@react-navigation/native":      "^6.1.17",
     "@react-navigation/native-stack":"^6.9.26",
     "@react-navigation/bottom-tabs": "^6.5.20",
