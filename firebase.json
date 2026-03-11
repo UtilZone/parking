@@ -9,7 +9,15 @@
   "functions": {
     "source": "functions",
     "codebase": "default",
-    "ignore": ["node_modules", ".git", "lib"]
+    "ignore": [
+      "node_modules",
+      ".git",
+      "*.log",
+      "src",
+      "*.ts",
+      "tsconfig.json",
+      ".eslintrc*"
+    ]
   },
   "hosting": [
     {

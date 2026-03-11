@@ -4,40 +4,41 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     function signedIn()    { return request.auth != null; }
-    function role()        { return request.auth.token.role; }
-    function tenantId()    { return request.auth.token.tenantId; }
-    function isSuperAdmin(){ return signedIn() && role() == 'superadmin'; }
-    function isOwner()     { return signedIn() && role() == 'owner'; }
-    function isAttendant() { return signedIn() && role() == 'attendant'; }
+    function userRole()    { return request.auth.token.role; }
+    function userTenantId(){ return request.auth.token.tenantId; }
+    function isSuperAdmin(){ return signedIn() && userRole() == 'superadmin'; }
+    function isOwner()     { return signedIn() && userRole() == 'owner'; }
+    function isAttendant() { return signedIn() && userRole() == 'attendant'; }
     function isImage()     { return request.resource.contentType.matches('image/.*'); }
     function maxSize(mb)   { return request.resource.size <= mb * 1024 * 1024; }
 
     // ── Tenant-scoped vehicle entry photos ──────────────────────────────
-    match /tenants/{tenantId}/sessions/{sessionId}/entry.jpg {
-      allow read:  if isSuperAdmin() || (signedIn() && tenantId() == tenantId);
-      allow write: if isAttendant()  && tenantId() == tenantId && isImage() && maxSize(5);
+    match /tenants/{tid}/sessions/{sessionId}/entry.jpg {
+      allow read:  if isSuperAdmin() || (signedIn() && userTenantId() == tid);
+      allow write: if isAttendant() && userTenantId() == tid && isImage() && maxSize(5);
     }
 
     // ── Tenant-scoped cash proof photos ──────────────────────────────────
-    match /tenants/{tenantId}/cash-proofs/{txnId}.jpg {
-      allow read:  if isSuperAdmin() || isOwner() && tenantId() == tenantId
-                   || isAttendant()  && tenantId() == tenantId;
-      allow write: if isAttendant()  && tenantId() == tenantId && isImage() && maxSize(5);
+    match /tenants/{tid}/cash-proofs/{txnId} {
+      allow read:  if isSuperAdmin()
+                   || (isOwner() && userTenantId() == tid)
+                   || (isAttendant() && userTenantId() == tid);
+      allow write: if isAttendant() && userTenantId() == tid && isImage() && maxSize(5);
     }
 
     // ── Tenant-scoped generated PDF reports ──────────────────────────────
-    match /tenants/{tenantId}/reports/{fileName} {
-      allow read:  if isSuperAdmin() || (isOwner() && tenantId() == tenantId);
-      allow write: if false;   // Cloud Functions only
+    match /tenants/{tid}/reports/{fileName} {
+      allow read:  if isSuperAdmin() || (isOwner() && userTenantId() == tid);
+      allow write: if false;
     }
 
     // ── User avatars ──────────────────────────────────────────────────────
-    match /avatars/{userId}.jpg {
+    match /avatars/{userId} {
       allow read:  if signedIn();
       allow write: if signedIn() && request.auth.uid == userId && isImage() && maxSize(2);
     }
 
-    // ── Platform-level assets (announcements, branding) ──────────────────
+    // ── Platform-level assets ─────────────────────────────────────────────
     match /_platform/{allPaths=**} {
       allow read:  if signedIn();
       allow write: if isSuperAdmin();

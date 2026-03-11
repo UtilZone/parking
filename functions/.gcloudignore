@@ -1,0 +1,7 @@
+# Ignore git and test files
+.git
+.gitignore
+
+# Do NOT ignore lib - Firebase needs the compiled output
+# node_modules will be reinstalled by Cloud Build
+node_modules

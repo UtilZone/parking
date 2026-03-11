@@ -4,20 +4,21 @@
   "private": true,
   "main": "lib/index.js",
   "scripts": {
-    "build":  "tsc",
-    "watch":  "tsc --watch",
-    "deploy": "npm run build && firebase deploy --only functions",
-    "lint":   "eslint --ext .ts src/"
+    "build":     "tsc",
+    "watch":     "tsc --watch",
+    "predeploy": "npm run build",
+    "deploy":    "npm run build && firebase deploy --only functions",
+    "lint":      "eslint --ext .ts src/"
   },
   "engines": { "node": "20" },
   "dependencies": {
     "firebase-admin":     "^12.1.0",
     "firebase-functions": "^5.1.0",
-    "pdfkit":             "^0.15.0"
+    "pdfkit":             "^0.15.0",
+    "typescript":         "^5.4.5"
   },
   "devDependencies": {
     "@types/node":   "^20.0.0",
-    "@types/pdfkit": "^0.13.4",
-    "typescript":    "^5.4.5"
+    "@types/pdfkit": "^0.13.4"
   }
 }

@@ -270,12 +270,12 @@ export const getPlatformStats = onCall({ region: 'asia-south1' }, async (req) =>
   ]);
 
   const tenants     = tenantsSnap.docs.map(d => d.data());
-  const byStatus    = tenants.reduce((acc, t) => {
+  const byStatus    = tenants.reduce((acc: Record<string, number>, t: Record<string, any>) => {
     acc[t.status] = (acc[t.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const byPlan      = tenants.reduce((acc, t) => {
+  const byPlan      = tenants.reduce((acc: Record<string, number>, t: Record<string, any>) => {
     acc[t.plan] = (acc[t.plan] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);

@@ -1,21 +1,16 @@
 # Node
 node_modules/
 npm-debug.log*
-
 # Firebase
 .firebase/
-functions/lib/
-
 # React build output
 apps/owner-dashboard/build/
 apps/superadmin-panel/build/
-
 # Expo / React Native
 apps/attendant/.expo/
 apps/customer/.expo/
 apps/attendant/dist/
 apps/customer/dist/
-
 # Firebase config (DO NOT COMMIT)
 apps/attendant/google-services.json
 apps/attendant/GoogleService-Info.plist
@@ -23,17 +18,14 @@ apps/customer/google-services.json
 apps/customer/GoogleService-Info.plist
 apps/owner-dashboard/src/config/firebase.ts
 apps/superadmin-panel/src/config/firebase.ts
-
 # Environment
 .env
 .env.local
 .env.*.local
-
 # IDE
 .vscode/
 .idea/
 *.swp
-
 # OS
 .DS_Store
 Thumbs.db
