@@ -1,0 +1,36 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "ignore": ["node_modules", ".git", "lib"]
+  },
+  "hosting": [
+    {
+      "target": "owner-dashboard",
+      "public": "apps/owner-dashboard/build",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    },
+    {
+      "target": "superadmin-panel",
+      "public": "apps/superadmin-panel/build",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    }
+  ],
+  "emulators": {
+    "auth":      { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
+    "hosting":   { "port": 5000 },
+    "storage":   { "port": 9199 },
+    "ui":        { "enabled": true, "port": 4000 }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "projects": {
+    "default": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
+  },
+  "targets": {
+    "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID": {
+      "hosting": {
+        "owner-dashboard": [
+          "REPLACE_WITH_OWNER_DASHBOARD_SITE_ID"
+        ],
+        "superadmin-panel": [
+          "REPLACE_WITH_SUPERADMIN_SITE_ID"
+        ]
+      }
+    }
+  }
+}

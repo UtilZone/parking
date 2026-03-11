@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "ParkSmart",
+    "slug": "parksmart-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0E1A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.utilzone.parking.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0E1A"
+      },
+      "package": "com.utilzone.parking.customer",
+      "permissions": ["CAMERA", "RECEIVE_BOOT_COMPLETED", "VIBRATE"],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      ["expo-notifications", { "icon": "./assets/notification-icon.png" }]
+    ],
+    "extra": {
+      "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" }
+    }
+  }
+}

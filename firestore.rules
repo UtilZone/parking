@@ -1,0 +1,165 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ParkSmart — Firestore Security Rules  (Multi-Tenant)
+//
+//  Tenant data lives under:  tenants/{tenantId}/...
+//  Platform data lives at:   _platform/...
+//
+//  Roles (set as Firebase Custom Claims):
+//    superadmin  — utilzone platform admin (full access)
+//    owner       — parking lot owner (scoped to their tenantId)
+//    attendant   — parking staff (scoped to tenantId + assignedLotId)
+//    customer    — vehicle owner (own sessions only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function signedIn()      { return request.auth != null; }
+    function uid()           { return request.auth.uid; }
+    function claims()        { return request.auth.token; }
+    function role()          { return claims().role; }
+    function tenantId()      { return claims().tenantId; }
+
+    function isSuperAdmin()  { return signedIn() && role() == 'superadmin'; }
+    function isOwner()       { return signedIn() && role() == 'owner'; }
+    function isAttendant()   { return signedIn() && role() == 'attendant'; }
+    function isCustomer()    { return signedIn() && role() == 'customer'; }
+
+    // Owner or attendant belonging to this tenant
+    function isTenantStaff(tid) {
+      return signedIn() && tenantId() == tid && (role() == 'owner' || role() == 'attendant');
+    }
+
+    function isTenantOwner(tid) {
+      return signedIn() && role() == 'owner' && tenantId() == tid;
+    }
+
+    function isTenantAttendant(tid) {
+      return signedIn() && role() == 'attendant' && tenantId() == tid;
+    }
+
+    // ── Platform-level collections (superadmin only) ──────────────────────
+
+    match /_platform/{doc} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /_platform/stats/{any=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /_platform/announcements/{docId} {
+      allow read:  if signedIn();   // all users can read global announcements
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Tenant registry (superadmin writes, owners read own) ─────────────
+
+    match /tenants/{tenantId} {
+      allow read:   if isSuperAdmin() || (signedIn() && tenantId() == tenantId);
+      allow create: if isSuperAdmin();      // only SA creates tenant docs
+      allow update: if isSuperAdmin()
+                    || (isTenantOwner(tenantId)
+                        && !request.resource.data.diff(resource.data)
+                            .affectedKeys().hasAny([
+                              'subscriptionStatus','plan','approvedAt',
+                              'suspendedAt','ownerUid'
+                            ]));            // owner cannot change billing fields
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Users (global collection — UID keyed) ────────────────────────────
+
+    match /users/{userId} {
+      allow read:   if isSuperAdmin()
+                    || (signedIn() && uid() == userId)
+                    || (isOwner() && resource.data.tenantId == tenantId());
+      allow create: if signedIn() && uid() == userId;
+      allow update: if signedIn() && uid() == userId
+                    && !request.resource.data.diff(resource.data)
+                        .affectedKeys().hasAny(['role','tenantId','assignedLotIds']);
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── Tenant sub-collections ────────────────────────────────────────────
+
+    match /tenants/{tenantId}/{collection}/{docId} {
+
+      // Parking Lots
+      match /parkingLots/{lotId} {
+        allow read:   if isSuperAdmin() || isTenantStaff(tenantId) || isCustomer();
+        allow create: if isTenantOwner(tenantId);
+        allow update: if isTenantOwner(tenantId);
+        allow delete: if isTenantOwner(tenantId);
+
+        // Slots sub-collection (only for slot_based lots)
+        match /slots/{slotId} {
+          allow read:  if isSuperAdmin() || isTenantStaff(tenantId) || isCustomer();
+          allow write: if false;   // only Cloud Functions write slots
+        }
+      }
+
+      // Sessions — immutable after creation, written by Cloud Functions
+      match /sessions/{sessionId} {
+        allow read:
+          if isSuperAdmin()
+          || isTenantOwner(tenantId)
+          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid())
+          || (isCustomer() && resource.data.customerId == uid());
+        allow write: if false;   // Cloud Functions only
+      }
+
+      // Transactions — create once, never update/delete
+      match /transactions/{txnId} {
+        allow read:
+          if isSuperAdmin()
+          || isTenantOwner(tenantId)
+          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid())
+          || (isCustomer() && resource.data.customerId == uid());
+        allow create: if isTenantAttendant(tenantId);
+        allow update, delete: if false;   // IMMUTABLE
+      }
+
+      // Shifts
+      match /shifts/{shiftId} {
+        allow read:
+          if isSuperAdmin()
+          || isTenantOwner(tenantId)
+          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid());
+        allow create: if isTenantAttendant(tenantId);
+        allow update:
+          if isTenantAttendant(tenantId)
+          && resource.data.attendantId == uid()
+          && resource.data.status == 'active';
+        allow delete: if false;
+      }
+
+      // Anomalies — written by Cloud Functions, read by owner
+      match /anomalies/{anomalyId} {
+        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow write: if false;
+      }
+
+      // Reports
+      match /reports/{reportId} {
+        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow write: if false;
+      }
+
+      // Subscription / billing info
+      match /subscription/{docId} {
+        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow write: if isSuperAdmin();
+      }
+    }
+
+    // ── Token counter (per tenant, per lot) ───────────────────────────────
+    match /_counters/{counterId} {
+      allow read, write: if false;   // Cloud Functions only
+    }
+  }
+}

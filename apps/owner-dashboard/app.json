@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "ParkSmart Owner",
+    "slug": "parksmart-owner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "com.utilzone.parking.owner"
+    },
+    "android": {
+      "package": "com.utilzone.parking.owner",
+      "googleServicesFile": "./google-services.json"
+    },
+    "extra": {
+      "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" }
+    }
+  }
+}
