@@ -9,12 +9,12 @@ import { getFunctions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
-  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
-  authDomain:        "REPLACE_WITH_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket:     "REPLACE_WITH_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
-  appId:             "REPLACE_WITH_YOUR_APP_ID",
+  apiKey:            "AIzaSyCKiPZAlR0CGootibjZoTSMjdUjUvRyYnI",
+  authDomain:        "utilzone-parking.firebaseapp.com",
+  projectId:         "utilzone-parking",
+  storageBucket:     "utilzone-parking.firebasestorage.app",
+  messagingSenderId: "1074471029697",
+  appId:             "1:1074471029697:web:cccd5913a2c3db2271bd40",
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];

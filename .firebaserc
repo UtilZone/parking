@@ -1,15 +1,15 @@
 {
   "projects": {
-    "default": "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
+    "default": "utilzone-parking"
   },
   "targets": {
-    "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID": {
+    "utilzone-parking": {
       "hosting": {
         "owner-dashboard": [
-          "REPLACE_WITH_OWNER_DASHBOARD_SITE_ID"
+          "utilzone-parking-owner"
         ],
         "superadmin-panel": [
-          "REPLACE_WITH_SUPERADMIN_SITE_ID"
+          "utilzone-parking-admin"
         ]
       }
     }
