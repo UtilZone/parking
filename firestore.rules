@@ -60,7 +60,8 @@ service cloud.firestore {
     // ── Tenant registry (superadmin writes, owners read own) ─────────────
 
     match /tenants/{tenantId} {
-      allow read:   if isSuperAdmin() || (signedIn() && tenantId() == tenantId);
+      allow get:    if isSuperAdmin() || (signedIn() && tenantId() == tenantId);
+      allow list:   if isSuperAdmin();
       allow create: if isSuperAdmin();      // only SA creates tenant docs
       allow update: if isSuperAdmin()
                     || (isTenantOwner(tenantId)
@@ -75,9 +76,10 @@ service cloud.firestore {
     // ── Users (global collection — UID keyed) ────────────────────────────
 
     match /users/{userId} {
-      allow read:   if isSuperAdmin()
+      allow get:    if isSuperAdmin()
                     || (signedIn() && uid() == userId)
                     || (isOwner() && resource.data.tenantId == tenantId());
+      allow list:   if isSuperAdmin() || isOwner();
       allow create: if signedIn() && uid() == userId;
       allow update: if signedIn() && uid() == userId
                     && !request.resource.data.diff(resource.data)
