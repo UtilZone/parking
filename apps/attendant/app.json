@@ -35,13 +35,31 @@
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      ["expo-camera",        { "cameraPermission": "ParkSmart uses the camera to scan number plates and QR codes." }],
-      ["expo-barcode-scanner", { "cameraPermission": "ParkSmart uses the camera to scan exit QR tokens." }],
-      ["expo-image-picker",  { "photosPermission": "ParkSmart accesses photos to attach cash payment evidence.", "cameraPermission": "ParkSmart uses the camera to photograph cash payments." }],
-      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#F59E0B" }]
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ParkSmart uses the camera to scan number plates and QR codes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ParkSmart accesses photos to attach cash payment evidence.",
+          "cameraPermission": "ParkSmart uses the camera to photograph cash payments."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F59E0B"
+        }
+      ]
     ],
     "extra": {
-      "eas": { "projectId": "local-build" }
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
     }
   }
 }
