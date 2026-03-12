@@ -12,7 +12,7 @@ const firebaseConfig = {
   apiKey:            "AIzaSyCKiPZAlR0CGootibjZoTSMjdUjUvRyYnI",
   authDomain:        "utilzone-parking.firebaseapp.com",
   projectId:         "utilzone-parking",
-  storageBucket:     "utilzone-parking.firebasestorage.app",
+  storageBucket:     "utilzone-parking.appspot.com",
   messagingSenderId: "1074471029697",
   appId:             "1:1074471029697:web:cccd5913a2c3db2271bd40",
 };
