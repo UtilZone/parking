@@ -38,7 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledAnomalyCheck = exports.generateReport = exports.onTransactionCreated = exports.endShift = exports.startShift = exports.vehicleExit = exports.vehicleEntry = void 0;
+exports.scheduledAnomalyCheck = exports.generateReport = exports.transactionReceiptHandler = exports.endShift = exports.startShift = exports.vehicleExit = exports.vehicleEntry = void 0;
 const admin = __importStar(require("firebase-admin"));
 const logger = __importStar(require("firebase-functions/logger"));
 const https_1 = require("firebase-functions/v2/https");
@@ -394,7 +394,7 @@ exports.endShift = (0, https_1.onCall)({ region: 'asia-south1' }, async (req) =>
     return { shiftId, totalRevenue: actualRevenue, expectedRevenue, discrepancy, status: isFlagged ? 'flagged' : 'closed' };
 });
 // ── 5. TRANSACTION CREATED → receipt FCM + revenue counter ───────────────────
-exports.onTransactionCreated = (0, firestore_1.onDocumentCreated)({ document: 'tenants/{tenantId}/transactions/{txnId}', region: 'asia-south1' }, async (event) => {
+exports.transactionReceiptHandler = (0, firestore_1.onDocumentCreated)({ document: 'tenants/{tenantId}/transactions/{txnId}', region: 'asia-south1' }, async (event) => {
     var _a, _b;
     const txn = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
     if (!txn)

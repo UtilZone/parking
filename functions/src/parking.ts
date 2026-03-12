@@ -11,8 +11,8 @@ import { onDocumentCreated }     from 'firebase-functions/v2/firestore';
 import { onSchedule }            from 'firebase-functions/v2/scheduler';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
-const db        = admin.firestore();
-const messaging = admin.messaging();
+const getDb = () => admin.firestore();
+const getMsg = () => admin.messaging();
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -44,14 +44,14 @@ function calcFare(
 }
 
 async function sendFcm(token: string, title: string, body: string, data?: Record<string, string>) {
-  try { await messaging.send({ token, notification: { title, body }, data }); }
+  try { await getMsg().send({ token, notification: { title, body }, data }); }
   catch (e) { logger.warn('FCM failed', e); }
 }
 
 async function getOwnerFcmToken(tenantId: string): Promise<string | null> {
-  const tenantDoc = await db.collection('tenants').doc(tenantId).get();
+  const tenantDoc = await getDb().collection('tenants').doc(tenantId).get();
   if (!tenantDoc.exists) return null;
-  const ownerDoc = await db.collection('users').doc(tenantDoc.data()!.ownerUid).get();
+  const ownerDoc = await getDb().collection('users').doc(tenantDoc.data()!.ownerUid).get();
   return ownerDoc.data()?.fcmToken ?? null;
 }
 
@@ -59,7 +59,7 @@ async function createAnomaly(
   tenantId: string, lotId: string, type: string,
   severity: 'low' | 'medium' | 'high', description: string, relatedId: string
 ) {
-  const ref = db.collection('tenants').doc(tenantId).collection('anomalies').doc();
+  const ref = getDb().collection('tenants').doc(tenantId).collection('anomalies').doc();
   await ref.set({
     anomalyId: ref.id, tenantId, lotId, type, severity,
     description, relatedId, isResolved: false, createdAt: Timestamp.now(),
@@ -95,7 +95,7 @@ export const vehicleEntry = onCall({ region: 'asia-south1' }, async (req) => {
   }
 
   const normPlate = normalisePlate(plateNumber);
-  const tenantRef = db.collection('tenants').doc(tenantId);
+  const tenantRef = getDb().collection('tenants').doc(tenantId);
 
   // Verify tenant is active
   const tenantDoc = await tenantRef.get();
@@ -161,12 +161,12 @@ export const vehicleEntry = onCall({ region: 'asia-south1' }, async (req) => {
   }
 
   // ── Atomic write ──────────────────────────────────────────────────────────
-  const counterRef  = db.collection('_counters').doc(`${tenantId}_${lotId}`);
+  const counterRef  = getDb().collection('_counters').doc(`${tenantId}_${lotId}`);
   const sessionRef  = tenantRef.collection('sessions').doc();
   let tokenNumber   = '';
   const now         = Timestamp.now();
 
-  await db.runTransaction(async (txn) => {
+  await getDb().runTransaction(async (txn) => {
     const counterDoc = await txn.get(counterRef);
     const counter    = (counterDoc.exists ? counterDoc.data()!.count : 0) + 1;
     tokenNumber      = genToken(counter);
@@ -216,7 +216,7 @@ export const vehicleEntry = onCall({ region: 'asia-south1' }, async (req) => {
 
   // FCM to customer
   if (customerPhone) {
-    const userSnap = await db.collection('users')
+    const userSnap = await getDb().collection('users')
       .where('phone', '==', customerPhone).limit(1).get();
     if (!userSnap.empty) {
       const fcmToken = userSnap.docs[0].data().fcmToken;
@@ -271,7 +271,7 @@ export const vehicleExit = onCall({ region: 'asia-south1' }, async (req) => {
     throw new HttpsError('invalid-argument', 'Cash payments require a photo proof URL.');
   }
 
-  const tenantRef  = db.collection('tenants').doc(tenantId);
+  const tenantRef  = getDb().collection('tenants').doc(tenantId);
   const sessionRef = tenantRef.collection('sessions').doc(sessionId);
   const sessionDoc = await sessionRef.get();
 
@@ -298,7 +298,7 @@ export const vehicleExit = onCall({ region: 'asia-south1' }, async (req) => {
                        .collection('slots').doc(session.slotId);
   }
 
-  await db.runTransaction(async (txn) => {
+  await getDb().runTransaction(async (txn) => {
     // Finalise session
     txn.update(sessionRef, {
       exitTime: now, durationMinutes: fare.durationMinutes,
@@ -364,14 +364,14 @@ export const startShift = onCall({ region: 'asia-south1' }, async (req) => {
   }
 
   // Attendant must be assigned to this lot
-  const userDoc = await db.collection('users').doc(req.auth.uid).get();
+  const userDoc = await getDb().collection('users').doc(req.auth.uid).get();
   const assignedLotIds: string[] = userDoc.data()?.assignedLotIds || [];
   if (!assignedLotIds.includes(lotId)) {
     throw new HttpsError('permission-denied', 'You are not assigned to this lot.');
   }
 
   // No duplicate active shift
-  const existing = await db.collection('tenants').doc(tenantId).collection('shifts')
+  const existing = await getDb().collection('tenants').doc(tenantId).collection('shifts')
     .where('attendantId', '==', req.auth.uid)
     .where('status', '==', 'active').limit(1).get();
 
@@ -379,7 +379,7 @@ export const startShift = onCall({ region: 'asia-south1' }, async (req) => {
     throw new HttpsError('already-exists', 'You already have an active shift. End it first.');
   }
 
-  const shiftRef = db.collection('tenants').doc(tenantId).collection('shifts').doc();
+  const shiftRef = getDb().collection('tenants').doc(tenantId).collection('shifts').doc();
   const userData = userDoc.data()!;
 
   await shiftRef.set({
@@ -411,7 +411,7 @@ export const endShift = onCall({ region: 'asia-south1' }, async (req) => {
 
   const { tenantId, shiftId } = req.data as { tenantId: string; shiftId: string };
 
-  const shiftRef = db.collection('tenants').doc(tenantId).collection('shifts').doc(shiftId);
+  const shiftRef = getDb().collection('tenants').doc(tenantId).collection('shifts').doc(shiftId);
   const shiftDoc = await shiftRef.get();
   if (!shiftDoc.exists) throw new HttpsError('not-found', 'Shift not found.');
 
@@ -421,7 +421,7 @@ export const endShift = onCall({ region: 'asia-south1' }, async (req) => {
   }
 
   // Sum expected revenue from completed sessions in this shift
-  const sessionsSnap = await db.collection('tenants').doc(tenantId).collection('sessions')
+  const sessionsSnap = await getDb().collection('tenants').doc(tenantId).collection('sessions')
     .where('shiftId', '==', shiftId)
     .where('status', '==', 'completed').get();
 
@@ -461,10 +461,10 @@ export const transactionReceiptHandler = onDocumentCreated(
 
     // Send receipt to customer
     if (txn.customerId) {
-      const userDoc  = await db.collection('users').doc(txn.customerId).get();
+      const userDoc  = await getDb().collection('users').doc(txn.customerId).get();
       const fcmToken = userDoc.data()?.fcmToken;
       if (fcmToken) {
-        await messaging.send({
+        await getMsg().send({
           token: fcmToken,
           notification: { title: '✅ Parking Receipt', body: `₹${txn.amount} paid via ${txn.method}.` },
           data: { txnId: txn.txnId, amount: String(txn.amount) },
@@ -474,7 +474,7 @@ export const transactionReceiptHandler = onDocumentCreated(
     }
 
     // Revenue aggregation on lot doc
-    await db.collection('tenants').doc(tenantId)
+    await getDb().collection('tenants').doc(tenantId)
             .collection('parkingLots').doc(txn.lotId)
             .update({
               'revenue.today': FieldValue.increment(txn.amount),
@@ -482,7 +482,7 @@ export const transactionReceiptHandler = onDocumentCreated(
             });
 
     // Platform-level revenue aggregation (superadmin visibility)
-    await db.collection('_platform').doc('stats').set({
+    await getDb().collection('_platform').doc('stats').set({
       totalRevenueAllTime: FieldValue.increment(txn.amount),
       txnCount:            FieldValue.increment(1),
     }, { merge: true });
@@ -507,7 +507,7 @@ export const generateReport = onCall({ region: 'asia-south1' }, async (req) => {
   const from = admin.firestore.Timestamp.fromDate(new Date(fromDate));
   const to   = admin.firestore.Timestamp.fromDate(new Date(toDate));
 
-  let query = db.collection('tenants').doc(tenantId).collection('transactions')
+  let query = getDb().collection('tenants').doc(tenantId).collection('transactions')
     .where('timestamp', '>=', from).where('timestamp', '<=', to);
   if (lotId) query = (query as any).where('lotId', '==', lotId);
 
@@ -521,7 +521,7 @@ export const generateReport = onCall({ region: 'asia-south1' }, async (req) => {
     return acc;
   }, {} as Record<string, number>);
 
-  const reportRef = db.collection('tenants').doc(tenantId).collection('reports').doc();
+  const reportRef = getDb().collection('tenants').doc(tenantId).collection('reports').doc();
   const report = {
     reportId: reportRef.id, tenantId, lotId: lotId || 'all',
     fromDate, toDate, totalTransactions: txns.length,
@@ -542,12 +542,12 @@ export const scheduledAnomalyCheck = onSchedule(
     const threshold = Timestamp.fromMillis(Date.now() - 8 * 3600_000);
 
     // Find all active sessions older than 8 hours across ALL tenants
-    const tenantsSnap = await db.collection('tenants')
+    const tenantsSnap = await getDb().collection('tenants')
       .where('status', '==', 'active').get();
 
     for (const tenantDoc of tenantsSnap.docs) {
       const tenantId  = tenantDoc.id;
-      const longStay  = await db.collection('tenants').doc(tenantId)
+      const longStay  = await getDb().collection('tenants').doc(tenantId)
         .collection('sessions')
         .where('status', '==', 'active')
         .where('entryTime', '<', threshold).get();
@@ -561,8 +561,8 @@ export const scheduledAnomalyCheck = onSchedule(
       }
 
       // Reset daily revenue counters on all lots
-      const lots = await db.collection('tenants').doc(tenantId).collection('parkingLots').get();
-      const batch = db.batch();
+      const lots = await getDb().collection('tenants').doc(tenantId).collection('parkingLots').get();
+      const batch = getDb().batch();
       lots.forEach(l => batch.update(l.ref, { 'revenue.today': 0 }));
       await batch.commit();
     }
