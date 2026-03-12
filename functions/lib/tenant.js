@@ -37,7 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlatformStats = exports.pushAnnouncement = exports.assignRole = exports.suspendTenant = exports.approveTenant = exports.registerTenant = void 0;
+exports.createAttendant = exports.getPlatformStats = exports.pushAnnouncement = exports.assignRole = exports.suspendTenant = exports.approveTenant = exports.registerTenant = void 0;
 const admin = __importStar(require("firebase-admin"));
 const logger = __importStar(require("firebase-functions/logger"));
 const https_1 = require("firebase-functions/v2/https");
@@ -253,5 +253,55 @@ exports.getPlatformStats = (0, https_1.onCall)({ region: 'asia-south1' }, async 
         totalOwners: usersSnap.size,
         fetchedAt: new Date().toISOString(),
     };
+});
+// ── CREATE ATTENDANT (owner creates auth account + assigns role) ──────────────
+exports.createAttendant = (0, https_1.onCall)({ region: 'asia-south1' }, async (req) => {
+    if (!req.auth || req.auth.token.role !== 'owner') {
+        throw new https_1.HttpsError('permission-denied', 'Owner access required.');
+    }
+    const { name, email, password, phone, assignedLotIds } = req.data;
+    if (!name || !email || !password) {
+        throw new https_1.HttpsError('invalid-argument', 'name, email, and password are required.');
+    }
+    if (password.length < 8) {
+        throw new https_1.HttpsError('invalid-argument', 'Password must be at least 8 characters.');
+    }
+    const tenantId = req.auth.token['tenantId'];
+    if (!tenantId)
+        throw new https_1.HttpsError('failed-precondition', 'No tenantId on owner token.');
+    // Create Firebase Auth account
+    let userRecord;
+    try {
+        userRecord = await admin.auth().createUser({
+            email, password,
+            displayName: name,
+        });
+    }
+    catch (e) {
+        if (e.code === 'auth/email-already-exists') {
+            throw new https_1.HttpsError('already-exists', 'An account with this email already exists.');
+        }
+        throw new https_1.HttpsError('internal', e.message);
+    }
+    const now = firestore_1.Timestamp.now();
+    // Set custom claims
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+        role: 'attendant',
+        tenantId,
+    });
+    // Create Firestore user document
+    await db.collection('users').doc(userRecord.uid).set({
+        uid: userRecord.uid,
+        name,
+        email,
+        phone: phone || '',
+        role: 'attendant',
+        tenantId,
+        assignedLotIds: assignedLotIds || [],
+        isActive: true,
+        createdAt: now,
+    });
+    logger.info('Attendant created', { uid: userRecord.uid, tenantId });
+    return { uid: userRecord.uid, success: true };
 });
 //# sourceMappingURL=tenant.js.map

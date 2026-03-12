@@ -37,7 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledAnomalyCheck = exports.generateReport = exports.onTransactionCreated = exports.endShift = exports.startShift = exports.vehicleExit = exports.vehicleEntry = exports.getPlatformStats = exports.pushAnnouncement = exports.assignRole = exports.suspendTenant = exports.approveTenant = exports.registerTenant = void 0;
+exports.scheduledAnomalyCheck = exports.generateReport = exports.transactionReceiptHandler = exports.endShift = exports.startShift = exports.vehicleExit = exports.vehicleEntry = exports.getPlatformStats = exports.pushAnnouncement = exports.createAttendant = exports.assignRole = exports.suspendTenant = exports.approveTenant = exports.registerTenant = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 // Tenant onboarding & superadmin
@@ -46,6 +46,7 @@ Object.defineProperty(exports, "registerTenant", { enumerable: true, get: functi
 Object.defineProperty(exports, "approveTenant", { enumerable: true, get: function () { return tenant_1.approveTenant; } });
 Object.defineProperty(exports, "suspendTenant", { enumerable: true, get: function () { return tenant_1.suspendTenant; } });
 Object.defineProperty(exports, "assignRole", { enumerable: true, get: function () { return tenant_1.assignRole; } });
+Object.defineProperty(exports, "createAttendant", { enumerable: true, get: function () { return tenant_1.createAttendant; } });
 Object.defineProperty(exports, "pushAnnouncement", { enumerable: true, get: function () { return tenant_1.pushAnnouncement; } });
 Object.defineProperty(exports, "getPlatformStats", { enumerable: true, get: function () { return tenant_1.getPlatformStats; } });
 // Core parking operations
@@ -54,7 +55,7 @@ Object.defineProperty(exports, "vehicleEntry", { enumerable: true, get: function
 Object.defineProperty(exports, "vehicleExit", { enumerable: true, get: function () { return parking_1.vehicleExit; } });
 Object.defineProperty(exports, "startShift", { enumerable: true, get: function () { return parking_1.startShift; } });
 Object.defineProperty(exports, "endShift", { enumerable: true, get: function () { return parking_1.endShift; } });
-Object.defineProperty(exports, "onTransactionCreated", { enumerable: true, get: function () { return parking_1.onTransactionCreated; } });
+Object.defineProperty(exports, "transactionReceiptHandler", { enumerable: true, get: function () { return parking_1.transactionReceiptHandler; } });
 Object.defineProperty(exports, "generateReport", { enumerable: true, get: function () { return parking_1.generateReport; } });
 Object.defineProperty(exports, "scheduledAnomalyCheck", { enumerable: true, get: function () { return parking_1.scheduledAnomalyCheck; } });
 //# sourceMappingURL=index.js.map
