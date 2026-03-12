@@ -1,18 +1,21 @@
 /**
  * OwnerLoginPage — Owner Dashboard Web App
- * Email + password login with "Register Business" flow.
+ * Email + password OR Google sign-in with "Register Business" flow.
  */
 
 import React, { useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { httpsCallable }          from 'firebase/functions';
 import { auth, firestore, functions } from '../config/firebase';
 
 type Mode = 'login' | 'register';
+const googleProvider = new GoogleAuthProvider();
 
 export default function OwnerLoginPage() {
   const [mode,     setMode]     = useState<Mode>('login');
@@ -25,9 +28,35 @@ export default function OwnerLoginPage() {
   const [step,     setStep]     = useState<'credentials' | 'business'>('credentials');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [gLoading, setGLoading] = useState(false);
   const [success,  setSuccess]  = useState(false);
+  const [pendingGoogleUid, setPendingGoogleUid] = useState('');
+  const [pendingGoogleEmail, setPendingGoogleEmail] = useState('');
 
-  // ── Login ─────────────────────────────────────────────────────────────────
+  // ── Google Sign-In ────────────────────────────────────────────────────────
+  const handleGoogleSignIn = async () => {
+    setError(''); setGLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // Check if this Google user already has a tenant registered
+      // If not, move them to the business registration step
+      const token = await result.user.getIdTokenResult();
+      if (!token.claims['tenantId']) {
+        // New Google user — need business details
+        setPendingGoogleUid(result.user.uid);
+        setPendingGoogleEmail(result.user.email || '');
+        setName(result.user.displayName || '');
+        setEmail(result.user.email || '');
+        setMode('register');
+        setStep('business');
+      }
+      // If tenantId exists, useOwnerAuth hook will handle redirect
+    } catch (err: any) {
+      setError(err.code === 'auth/popup-closed-by-user' ? 'Sign-in cancelled.' : err.message);
+    } finally { setGLoading(false); }
+  };
+
+  // ── Email Login ───────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setLoading(true);
@@ -55,20 +84,26 @@ export default function OwnerLoginPage() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      // Create Firebase Auth account
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      const uid  = cred.user.uid;
+      let uid = pendingGoogleUid;
 
-      // Create user document
-      await setDoc(doc(firestore, 'users', uid), {
-        uid, name, phone, email,
-        role: 'owner', isActive: true, createdAt: Timestamp.now(),
-      });
+      if (!uid) {
+        // Email registration
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        uid = cred.user.uid;
+        await setDoc(doc(firestore, 'users', uid), {
+          uid, name, phone, email,
+          role: 'owner', isActive: true, createdAt: Timestamp.now(),
+        });
+      } else {
+        // Google registration — update user doc with business phone + name
+        await setDoc(doc(firestore, 'users', uid), {
+          uid, name, phone, email: pendingGoogleEmail,
+          role: 'owner', isActive: true, createdAt: Timestamp.now(),
+        }, { merge: true });
+      }
 
-      // Register tenant (will be pending approval)
       const fn = httpsCallable(functions, 'registerTenant');
-      await fn({ businessName: bizName, ownerName: name, phone, email, registrationNote: note });
-
+      await fn({ businessName: bizName, ownerName: name, phone, email: email || pendingGoogleEmail, registrationNote: note });
       setSuccess(true);
     } catch (err: any) {
       setError(
@@ -114,11 +149,24 @@ export default function OwnerLoginPage() {
         <div style={css.modeRow}>
           {(['login', 'register'] as Mode[]).map(m => (
             <button key={m} style={{ ...css.modeBtn, ...(mode === m ? css.modeBtnActive : {}) }}
-              onClick={() => { setMode(m); setError(''); setStep('credentials'); }}>
+              onClick={() => { setMode(m); setError(''); setStep('credentials'); setPendingGoogleUid(''); }}>
               {m === 'login' ? 'Sign In' : 'Register Business'}
             </button>
           ))}
         </div>
+
+        {/* Google button — show on login and register step 1 */}
+        {(mode === 'login' || (mode === 'register' && step === 'credentials')) && (
+          <>
+            <button style={css.googleBtn} onClick={handleGoogleSignIn} disabled={gLoading} type="button">
+              {gLoading ? 'Signing in…' : (
+                <><span style={{ fontSize: 16, marginRight: 8 }}>G</span>
+                  {mode === 'login' ? 'Continue with Google' : 'Register with Google'}</>
+              )}
+            </button>
+            <div style={css.divider}><span style={css.dividerText}>or</span></div>
+          </>
+        )}
 
         {/* Login form */}
         {mode === 'login' && (
@@ -147,10 +195,20 @@ export default function OwnerLoginPage() {
           </form>
         )}
 
-        {/* Register — Step 2: Business */}
+        {/* Register — Step 2: Business (email or google) */}
         {mode === 'register' && step === 'business' && (
           <form onSubmit={handleRegister}>
-            <div style={css.stepLabel}>STEP 2 OF 2 — YOUR BUSINESS</div>
+            <div style={css.stepLabel}>
+              {pendingGoogleUid ? 'GOOGLE SIGN-UP — BUSINESS DETAILS' : 'STEP 2 OF 2 — YOUR BUSINESS'}
+            </div>
+            {pendingGoogleUid && (
+              <div style={{ ...css.error, background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.3)', color: '#F59E0B', marginBottom: 16 }}>
+                Signed in as {pendingGoogleEmail}. Please complete your business details.
+              </div>
+            )}
+            {!pendingGoogleUid && (
+              <Field label="MOBILE NO." type="tel" value={phone} onChange={setPhone} placeholder="+91 XXXXXXXXXX" />
+            )}
             <Field label="BUSINESS NAME" type="text" value={bizName} onChange={setBizName} placeholder="e.g. Shivaji Nagar Parking Pvt Ltd" />
             <div style={css.fieldWrap}>
               <label style={css.fieldLabel}>NOTE TO ADMIN (OPTIONAL)</label>
@@ -160,8 +218,10 @@ export default function OwnerLoginPage() {
             </div>
             {error && <div style={css.error}>{error}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button type="button" style={{ ...css.btn, background: '#131B2A', color: '#5A7090', flex: 1 }}
-                onClick={() => setStep('credentials')}>← Back</button>
+              {!pendingGoogleUid && (
+                <button type="button" style={{ ...css.btn, background: '#131B2A', color: '#5A7090', flex: 1 }}
+                  onClick={() => setStep('credentials')}>← Back</button>
+              )}
               <button style={{ ...css.btn, flex: 2 }} type="submit" disabled={loading || !bizName}>
                 {loading ? 'Submitting…' : 'Submit for Approval →'}
               </button>
@@ -173,7 +233,6 @@ export default function OwnerLoginPage() {
   );
 }
 
-// Reusable form field
 function Field({ label, type, value, onChange, placeholder }: {
   label: string; type: string; value: string;
   onChange: (v: string) => void; placeholder: string;
@@ -201,6 +260,14 @@ const css: Record<string, React.CSSProperties> = {
   modeBtn:      { flex: 1, background: 'none', border: 'none', color: '#5A7090',
                   fontSize: 13, fontWeight: 600, padding: '8px 0', borderRadius: 8, cursor: 'pointer' },
   modeBtnActive:{ background: '#1E2D45', color: '#F0F4FF' },
+  googleBtn:    { width: '100%', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10,
+                  padding: '12px', fontSize: 13, fontWeight: 700, color: '#1a1a1a',
+                  cursor: 'pointer', marginBottom: 16, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center' },
+  divider:      { position: 'relative', textAlign: 'center', marginBottom: 16,
+                  borderTop: '1px solid #1E2D45' },
+  dividerText:  { position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)',
+                  background: '#131B2A', padding: '0 10px', color: '#5A7090', fontSize: 12 },
   stepLabel:    { fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#5A7090',
                   textTransform: 'uppercase', marginBottom: 16 },
   fieldWrap:    { marginBottom: 16 },

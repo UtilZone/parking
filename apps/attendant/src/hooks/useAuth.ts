@@ -1,15 +1,15 @@
 /**
  * useAuth — Attendant App
- * Phone OTP login. Reads tenantId + assignedLotIds from Custom Claims.
+ * Email + password login. Reads tenantId + assignedLotIds from Custom Claims.
  */
 
 import { useState, useEffect } from 'react';
 import {
-  signInWithPhoneNumber, signOut as fbSignOut,
+  signInWithEmailAndPassword,
+  signOut as fbSignOut,
   onAuthStateChanged, User,
-  ApplicationVerifier, ConfirmationResult,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, firestore } from '../config/firebase';
 
 export interface AttendantUser extends User {
@@ -21,12 +21,11 @@ export interface AttendantUser extends User {
 }
 
 interface UseAuthReturn {
-  user:            AttendantUser | null;
-  isLoading:       boolean;
-  sendOtp:         (phone: string, verifier: ApplicationVerifier) => Promise<ConfirmationResult>;
-  verifyOtp:       (confirmation: ConfirmationResult, otp: string) => Promise<void>;
-  signOut:         () => Promise<void>;
-  error:           string | null;
+  user:      AttendantUser | null;
+  isLoading: boolean;
+  login:     (email: string, password: string) => Promise<void>;
+  signOut:   () => Promise<void>;
+  error:     string | null;
 }
 
 export function useAuth(): UseAuthReturn {
@@ -38,25 +37,31 @@ export function useAuth(): UseAuthReturn {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const token       = await fbUser.getIdTokenResult(true);
-          const role        = (token.claims['role'] as string) || '';
-          const tenantId    = (token.claims['tenantId'] as string) || '';
+          const token    = await fbUser.getIdTokenResult(true);
+          const role     = (token.claims['role'] as string) || '';
+          const tenantId = (token.claims['tenantId'] as string) || '';
 
-          // Fetch profile + tenant status
+          if (role !== 'attendant') {
+            await fbSignOut(auth);
+            setUser(null);
+            setError('This app is for attendants only.');
+            setIsLoading(false);
+            return;
+          }
+
           const [userDoc, tenantDoc] = await Promise.all([
             getDoc(doc(firestore, 'users', fbUser.uid)),
             tenantId ? getDoc(doc(firestore, 'tenants', tenantId)) : Promise.resolve(null),
           ]);
 
           const userData = userDoc.data() || {};
-
           setUser({
             ...fbUser,
             role,
             tenantId,
             assignedLotIds:  userData.assignedLotIds || [],
-            displayFullName: userData.name || '',
-            tenantStatus:    tenantDoc?.data()?.status,
+            displayFullName: userData.name || fbUser.email || '',
+            tenantStatus:    (tenantDoc as any)?.data()?.status,
           } as AttendantUser);
         } catch (e) {
           console.error('Auth load error', e);
@@ -70,38 +75,12 @@ export function useAuth(): UseAuthReturn {
     return unsub;
   }, []);
 
-  const sendOtp = async (phone: string, verifier: ApplicationVerifier) => {
+  const login = async (email: string, password: string) => {
     setError(null);
-    const formatted = phone.startsWith('+') ? phone : `+91${phone}`;
-    return signInWithPhoneNumber(auth, formatted, verifier);
-  };
-
-  const verifyOtp = async (confirmation: ConfirmationResult, otp: string) => {
-    setError(null);
-    try {
-      const cred    = await confirmation.confirm(otp);
-      const fbUser  = cred.user;
-      const userRef = doc(firestore, 'users', fbUser.uid);
-      const exists  = await getDoc(userRef);
-      if (!exists.exists()) {
-        // First login — create placeholder profile (owner will assign role)
-        await setDoc(userRef, {
-          uid: fbUser.uid, phone: fbUser.phoneNumber,
-          name: '', email: '', role: 'attendant',
-          tenantId: '', assignedLotIds: [],
-          isActive: true, createdAt: Timestamp.now(),
-        });
-      }
-    } catch (e: any) {
-      const msg = e.code === 'auth/invalid-verification-code'
-        ? 'Invalid OTP. Please try again.'
-        : e.message;
-      setError(msg);
-      throw new Error(msg);
-    }
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signOut = () => fbSignOut(auth);
 
-  return { user, isLoading, sendOtp, verifyOtp, signOut, error };
+  return { user, isLoading, login, signOut, error };
 }

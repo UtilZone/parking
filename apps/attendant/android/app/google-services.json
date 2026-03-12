@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1074471029697",
+    "project_id": "utilzone-parking",
+    "storage_bucket": "utilzone-parking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074471029697:android:e075094d49d0153b71bd40",
+        "android_client_info": {
+          "package_name": "com.utilzone.parking.attendant"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1074471029697-vb43q2ei7skou56k4f9e97cjnhk691m7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1KjldL5wsgiPfpVhkivXlD21ndzjentQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1074471029697-vb43q2ei7skou56k4f9e97cjnhk691m7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

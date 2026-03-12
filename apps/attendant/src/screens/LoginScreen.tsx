@@ -1,77 +1,42 @@
 /**
  * LoginScreen — Attendant App
- * Phone number → OTP verification → custom claims loaded
+ * Email + password login (attendants are pre-registered by owners)
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, KeyboardAvoidingView,
   Platform, Alert, ScrollView,
 } from 'react-native';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
-import { ConfirmationResult }             from 'firebase/auth';
-import { useAuth }                        from '../hooks/useAuth';
-import app                                from '../config/firebase';
-
-type Step = 'phone' | 'otp';
+import { useAuth } from '../hooks/useAuth';
 
 export default function LoginScreen() {
-  const { sendOtp, verifyOtp, error } = useAuth();
-  const recaptchaRef = useRef<FirebaseRecaptchaVerifierModal>(null);
+  const { login, error } = useAuth();
 
-  const [step,         setStep]         = useState<Step>('phone');
-  const [phone,        setPhone]        = useState('');
-  const [otp,          setOtp]          = useState('');
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const [isLoading,    setIsLoading]    = useState(false);
-  const otpRefs       = Array.from({ length: 6 }, () => useRef<TextInput>(null));
+  const [email,     setEmail]     = useState('');
+  const [password,  setPassword]  = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPass,  setShowPass]  = useState(false);
 
-  const handleSendOtp = async () => {
-    const clean = phone.replace(/\D/g, '');
-    if (clean.length < 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid 10-digit mobile number.');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Missing Fields', 'Please enter your email and password.');
       return;
     }
-    if (!recaptchaRef.current) return;
-
     setIsLoading(true);
     try {
-      const result = await sendOtp(clean, recaptchaRef.current);
-      setConfirmation(result);
-      setStep('otp');
+      await login(email.trim(), password);
     } catch (e: any) {
-      Alert.alert('OTP Failed', e.message || 'Could not send OTP. Try again.');
+      Alert.alert('Login Failed',
+        e.code === 'auth/wrong-password'   ? 'Incorrect password.' :
+        e.code === 'auth/user-not-found'   ? 'No account found with this email.' :
+        e.code === 'auth/invalid-email'    ? 'Invalid email address.' :
+        e.message || 'Login failed. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6 || !confirmation) return;
-    setIsLoading(true);
-    try {
-      await verifyOtp(confirmation, otp);
-      // Auth state change handled by useAuth → RootNavigator re-renders
-    } catch (e: any) {
-      Alert.alert('Wrong OTP', e.message || 'Verification failed.');
-      setOtp('');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // OTP box input handler
-  const handleOtpChar = (char: string, index: number) => {
-    const arr = otp.split('');
-    arr[index] = char;
-    const joined = arr.join('').slice(0, 6);
-    setOtp(joined);
-    if (char && index < 5) otpRefs[index + 1].current?.focus();
-  };
-
-  const handleOtpBackspace = (index: number) => {
-    if (index > 0 && !otp[index]) otpRefs[index - 1].current?.focus();
   };
 
   return (
@@ -79,12 +44,6 @@ export default function LoginScreen() {
       style={styles.shell}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaRef}
-        firebaseConfig={app.options}
-        attemptInvisibleVerification
-      />
-
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
         {/* Brand */}
@@ -95,87 +54,57 @@ export default function LoginScreen() {
         <Text style={styles.subtitle}>Attendant Portal</Text>
 
         <View style={styles.card}>
-          {step === 'phone' ? (
-            <>
-              <Text style={styles.cardTitle}>Enter Mobile Number</Text>
-              <Text style={styles.cardSub}>
-                We'll send a verification code to confirm your identity.
-              </Text>
+          <Text style={styles.cardTitle}>Sign In</Text>
+          <Text style={styles.cardSub}>
+            Use the credentials provided by your parking lot manager.
+          </Text>
 
-              <View style={styles.phoneRow}>
-                <View style={styles.countryCode}>
-                  <Text style={styles.countryCodeText}>🇮🇳 +91</Text>
-                </View>
-                <TextInput
-                  style={styles.phoneInput}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="98XXXXXXXX"
-                  placeholderTextColor="#3A506B"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  autoFocus
-                />
-              </View>
+          {/* Email */}
+          <Text style={styles.fieldLabel}>EMAIL</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="attendant@business.com"
+            placeholderTextColor="#3A506B"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
-              <TouchableOpacity
-                style={[styles.primaryBtn, (isLoading || phone.replace(/\D/g,'').length < 10) && styles.btnDisabled]}
-                onPress={handleSendOtp}
-                disabled={isLoading || phone.replace(/\D/g,'').length < 10}
-              >
-                {isLoading
-                  ? <ActivityIndicator color="#000" />
-                  : <Text style={styles.primaryBtnText}>SEND OTP →</Text>
-                }
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.cardTitle}>Enter OTP</Text>
-              <Text style={styles.cardSub}>
-                Sent to +91 {phone}{' '}
-                <Text style={styles.changeLink} onPress={() => { setStep('phone'); setOtp(''); }}>
-                  Change
-                </Text>
-              </Text>
+          {/* Password */}
+          <Text style={styles.fieldLabel}>PASSWORD</Text>
+          <View style={styles.passRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor="#3A506B"
+              secureTextEntry={!showPass}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass(p => !p)}>
+              <Text style={styles.eyeText}>{showPass ? '🙈' : '👁️'}</Text>
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.otpRow}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <TextInput
-                    key={i}
-                    ref={otpRefs[i]}
-                    style={[styles.otpBox, otp[i] ? styles.otpBoxFilled : null]}
-                    value={otp[i] || ''}
-                    onChangeText={char => handleOtpChar(char.slice(-1), i)}
-                    onKeyPress={({ nativeEvent }) => {
-                      if (nativeEvent.key === 'Backspace') handleOtpBackspace(i);
-                    }}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    textAlign="center"
-                    selectTextOnFocus
-                  />
-                ))}
-              </View>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              <TouchableOpacity
-                style={[styles.primaryBtn, (isLoading || otp.length !== 6) && styles.btnDisabled]}
-                onPress={handleVerifyOtp}
-                disabled={isLoading || otp.length !== 6}
-              >
-                {isLoading
-                  ? <ActivityIndicator color="#000" />
-                  : <Text style={styles.primaryBtnText}>VERIFY & LOGIN</Text>
-                }
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryBtn, (isLoading || !email || !password) && styles.btnDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading || !email || !password}
+          >
+            {isLoading
+              ? <ActivityIndicator color="#000" />
+              : <Text style={styles.primaryBtnText}>SIGN IN →</Text>
+            }
+          </TouchableOpacity>
 
-              <TouchableOpacity style={styles.resendBtn} onPress={() => { setStep('phone'); setOtp(''); }}>
-                <Text style={styles.resendBtnText}>Resend OTP</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          <Text style={styles.helpText}>
+            Contact your lot manager if you don't have credentials.
+          </Text>
         </View>
 
         <Text style={styles.footer}>com.utilzone.parking · Attendant v1.0</Text>
@@ -198,28 +127,22 @@ const styles = StyleSheet.create({
   cardTitle:  { fontSize: 18, fontWeight: '800', color: '#F0F4FF', marginBottom: 6 },
   cardSub:    { fontSize: 13, color: '#5A7090', marginBottom: 24, lineHeight: 20 },
 
-  phoneRow:       { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  countryCode:    { backgroundColor: '#0A0E1A', borderRadius: 12, borderWidth: 1,
-                    borderColor: '#1E2D45', paddingHorizontal: 14, justifyContent: 'center' },
-  countryCodeText:{ fontSize: 14, fontWeight: '700', color: '#F0F4FF' },
-  phoneInput:     { flex: 1, backgroundColor: '#0A0E1A', borderRadius: 12, borderWidth: 1.5,
-                    borderColor: '#F59E0B', padding: 14, fontSize: 18, color: '#F0F4FF',
-                    fontFamily: 'monospace', letterSpacing: 2 },
+  fieldLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, color: '#5A7090',
+                textTransform: 'uppercase', marginBottom: 6 },
+  input:      { backgroundColor: '#0A0E1A', borderRadius: 12, borderWidth: 1.5,
+                borderColor: '#1E2D45', padding: 14, fontSize: 15, color: '#F0F4FF',
+                marginBottom: 16 },
+  passRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  eyeBtn:     { padding: 14, backgroundColor: '#0A0E1A', borderRadius: 12,
+                borderWidth: 1.5, borderColor: '#1E2D45' },
+  eyeText:    { fontSize: 16 },
 
-  otpRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
-  otpBox:     { width: 44, height: 52, backgroundColor: '#0A0E1A', borderRadius: 10,
-                borderWidth: 1.5, borderColor: '#1E2D45', fontSize: 20, fontWeight: '800',
-                color: '#F0F4FF' },
-  otpBoxFilled:{ borderColor: '#F59E0B' },
-
-  primaryBtn:     { backgroundColor: '#F59E0B', borderRadius: 12, padding: 15, alignItems: 'center' },
+  primaryBtn:     { backgroundColor: '#F59E0B', borderRadius: 12, padding: 15,
+                    alignItems: 'center', marginTop: 4 },
   btnDisabled:    { opacity: 0.35 },
   primaryBtnText: { fontSize: 14, fontWeight: '800', color: '#000', letterSpacing: 0.5 },
 
-  changeLink:   { color: '#F59E0B', fontWeight: '700' },
-  resendBtn:    { marginTop: 14, alignItems: 'center' },
-  resendBtnText:{ fontSize: 13, color: '#5A7090' },
-
-  errorText: { marginTop: 14, fontSize: 12, color: '#EF4444', textAlign: 'center' },
+  helpText:  { marginTop: 16, fontSize: 12, color: '#3A506B', textAlign: 'center', lineHeight: 18 },
+  errorText: { marginTop: 8, marginBottom: 8, fontSize: 12, color: '#EF4444', textAlign: 'center' },
   footer:    { marginTop: 40, textAlign: 'center', fontSize: 10, color: '#253550' },
 });
