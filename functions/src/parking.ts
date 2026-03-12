@@ -451,7 +451,7 @@ export const endShift = onCall({ region: 'asia-south1' }, async (req) => {
 
 // ── 5. TRANSACTION CREATED → receipt FCM + revenue counter ───────────────────
 
-export const onTransactionCreated = onDocumentCreated(
+export const transactionReceiptHandler = onDocumentCreated(
   { document: 'tenants/{tenantId}/transactions/{txnId}', region: 'asia-south1' },
   async (event) => {
     const txn = event.data?.data();
