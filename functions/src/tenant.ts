@@ -290,3 +290,64 @@ export const getPlatformStats = onCall({ region: 'asia-south1' }, async (req) =>
     fetchedAt:      new Date().toISOString(),
   };
 });
+
+// ── CREATE ATTENDANT (owner creates auth account + assigns role) ──────────────
+
+export const createAttendant = onCall({ region: 'asia-south1' }, async (req) => {
+  if (!req.auth || req.auth.token.role !== 'owner') {
+    throw new HttpsError('permission-denied', 'Owner access required.');
+  }
+
+  const { name, email, password, phone, assignedLotIds } = req.data as {
+    name: string; email: string; password: string;
+    phone?: string; assignedLotIds?: string[];
+  };
+
+  if (!name || !email || !password) {
+    throw new HttpsError('invalid-argument', 'name, email, and password are required.');
+  }
+  if (password.length < 8) {
+    throw new HttpsError('invalid-argument', 'Password must be at least 8 characters.');
+  }
+
+  const tenantId = req.auth.token['tenantId'] as string;
+  if (!tenantId) throw new HttpsError('failed-precondition', 'No tenantId on owner token.');
+
+  // Create Firebase Auth account
+  let userRecord;
+  try {
+    userRecord = await admin.auth().createUser({
+      email, password,
+      displayName: name,
+    });
+  } catch (e: any) {
+    if (e.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'An account with this email already exists.');
+    }
+    throw new HttpsError('internal', e.message);
+  }
+
+  const now = Timestamp.now();
+
+  // Set custom claims
+  await admin.auth().setCustomUserClaims(userRecord.uid, {
+    role: 'attendant',
+    tenantId,
+  });
+
+  // Create Firestore user document
+  await db.collection('users').doc(userRecord.uid).set({
+    uid:            userRecord.uid,
+    name,
+    email,
+    phone:          phone || '',
+    role:           'attendant',
+    tenantId,
+    assignedLotIds: assignedLotIds || [],
+    isActive:       true,
+    createdAt:      now,
+  });
+
+  logger.info('Attendant created', { uid: userRecord.uid, tenantId });
+  return { uid: userRecord.uid, success: true };
+});

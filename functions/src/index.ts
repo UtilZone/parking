@@ -12,6 +12,7 @@ export {
   approveTenant,
   suspendTenant,
   assignRole,
+  createAttendant,
   pushAnnouncement,
   getPlatformStats,
 } from './tenant';
@@ -22,7 +23,7 @@ export {
   vehicleExit,
   startShift,
   endShift,
-  onTransactionCreated,
+  transactionReceiptHandler,
   generateReport,
   scheduledAnomalyCheck,
 } from './parking';

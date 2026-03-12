@@ -8,7 +8,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
   ActivityIndicator, ScrollView, TextInput,
 } from 'react-native';
-import { BarCodeScanner }   from 'expo-barcode-scanner';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { httpsCallable }    from 'firebase/functions';
 import { doc, getDoc }      from 'firebase/firestore';
 import * as ImagePicker     from 'expo-image-picker';
@@ -50,6 +50,7 @@ interface Props { shiftId: string; activeLot: ActiveLot; }
 
 export default function VehicleExitScreen({ activeLot }: Props) {
   const { user } = useAuth();
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanning,      setScanning]      = useState(false);
   const [session,       setSession]       = useState<SessionData | null>(null);
   const [payMethod,     setPayMethod]     = useState<PaymentMethod>('UPI');
@@ -217,10 +218,10 @@ export default function VehicleExitScreen({ activeLot }: Props) {
   if (scanning) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000' }}>
-        <BarCodeScanner
+        <CameraView
           style={StyleSheet.absoluteFillObject}
-          onBarCodeScanned={onBarCodeScanned}
-          barCodeTypes={[BarCodeScanner.Constants.BarCodeType.qr]}
+          onBarcodeScanned={onBarCodeScanned}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         />
         <View style={styles.scanOverlay}>
           <Text style={styles.scanTitle}>Scan Exit QR Code</Text>
@@ -247,7 +248,7 @@ export default function VehicleExitScreen({ activeLot }: Props) {
           {/* Scan QR */}
           <TouchableOpacity
             style={styles.scanQrBtn}
-            onPress={() => { hasScanned.current = false; setScanning(true); }}
+            onPress={async () => { if (!permission?.granted) await requestPermission(); hasScanned.current = false; setScanning(true); }}
           >
             <Text style={styles.scanQrIcon}>📷</Text>
             <Text style={styles.scanQrTitle}>Scan QR Token</Text>

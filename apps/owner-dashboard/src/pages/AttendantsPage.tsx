@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   collection, query, where, onSnapshot, doc,
-  updateDoc, Timestamp, addDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { firestore, functions } from '../config/firebase';
@@ -35,10 +35,13 @@ export default function AttendantsPage({ tenantId }: Props) {
   const [msg,        setMsg]        = useState('');
   // Invite form
   const [showInvite, setShowInvite] = useState(false);
-  const [invPhone,   setInvPhone]   = useState('');
   const [invName,    setInvName]    = useState('');
+  const [invEmail,   setInvEmail]   = useState('');
+  const [invPassword,setInvPassword]= useState('');
+  const [invPhone,   setInvPhone]   = useState('');
   const [invLots,    setInvLots]    = useState<string[]>([]);
   const [inviting,   setInviting]   = useState(false);
+  const [showPass,   setShowPass]   = useState(false);
   // Edit assignments
   const [editing,    setEditing]    = useState<Attendant | null>(null);
   const [editLots,   setEditLots]   = useState<string[]>([]);
@@ -65,24 +68,25 @@ export default function AttendantsPage({ tenantId }: Props) {
     });
   }, [tenantId]);
 
-  // ── Invite attendant by phone ────────────────────────────────────────────
+  // ── Create attendant with email + password ──────────────────────────────
   const handleInvite = async () => {
-    const phone = invPhone.replace(/\D/g, '');
-    if (phone.length < 10 || !invName) { flash('❌ Name and 10-digit phone required.'); return; }
+    if (!invName || !invEmail || !invPassword) {
+      flash('❌ Name, email and password are required.'); return;
+    }
+    if (invPassword.length < 8) { flash('❌ Password must be at least 8 characters.'); return; }
     setInviting(true);
     try {
-      // We create a placeholder user document.
-      // When they log in via OTP, they'll get the role + tenantId.
-      // Owner then calls assignRole to elevate them.
-      const userRef = await addDoc(collection(firestore, 'users'), {
-        name: invName, phone: `+91${phone}`,
-        email: '', role: 'attendant',
-        tenantId, assignedLotIds: invLots,
-        isActive: true, createdAt: Timestamp.now(),
+      const fn = httpsCallable(functions, 'createAttendant');
+      await fn({
+        name: invName,
+        email: invEmail.trim(),
+        password: invPassword,
+        phone: invPhone ? `+91${invPhone.replace(/\D/g, '')}` : '',
+        assignedLotIds: invLots,
       });
-
-      flash(`✅ ${invName} added. They'll need to log in via the Attendant app using +91${phone}.`);
-      setShowInvite(false); setInvPhone(''); setInvName(''); setInvLots([]);
+      flash(`✅ ${invName} added. They can log in with ${invEmail} on the Attendant app.`);
+      setShowInvite(false);
+      setInvName(''); setInvEmail(''); setInvPassword(''); setInvPhone(''); setInvLots([]);
     } catch (e: any) {
       flash(`❌ ${e.message}`);
     } finally { setInviting(false); }
@@ -199,17 +203,26 @@ export default function AttendantsPage({ tenantId }: Props) {
             </div>
             <div style={css.modalBody}>
               <p style={css.hint}>
-                Add your staff member's name and mobile number. When they log in with the Attendant app
-                using their phone number, they'll be automatically linked to your account.
+                Create login credentials for your staff member. Share the email and password with them
+                to log in on the Attendant app.
               </p>
               <Label>FULL NAME</Label>
               <input style={css.input} value={invName} onChange={e => setInvName(e.target.value)} placeholder="e.g. Ramesh Kumar" />
-              <Label>MOBILE NUMBER</Label>
+              <Label>EMAIL (LOGIN ID)</Label>
+              <input style={css.input} type="email" value={invEmail} onChange={e => setInvEmail(e.target.value)} placeholder="ramesh@yourcompany.com" />
+              <Label>PASSWORD</Label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input style={{ ...css.input, flex: 1 }} type={showPass ? 'text' : 'password'}
+                  value={invPassword} onChange={e => setInvPassword(e.target.value)} placeholder="Min. 8 characters" />
+                <button type="button" style={{ ...css.input, width: 44, cursor: 'pointer', textAlign: 'center' as const }}
+                  onClick={() => setShowPass(p => !p)}>{showPass ? '🙈' : '👁️'}</button>
+              </div>
+              <Label>MOBILE NUMBER (OPTIONAL)</Label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span style={{ color: '#5A7090', fontSize: 13, fontWeight: 700 }}>+91</span>
                 <input style={{ ...css.input, flex: 1, fontFamily: 'monospace' }}
                   value={invPhone} onChange={e => setInvPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="98XXXXXXXX" keyboardType="number-pad" />
+                  placeholder="98XXXXXXXX" />
               </div>
               <Label>ASSIGN TO LOTS</Label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
