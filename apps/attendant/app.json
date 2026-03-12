@@ -41,7 +41,7 @@
       ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#F59E0B" }]
     ],
     "extra": {
-      "eas": { "projectId": "REPLACE_WITH_EAS_PROJECT_ID" }
+      "eas": { "projectId": "local-build" }
     }
   }
 }
