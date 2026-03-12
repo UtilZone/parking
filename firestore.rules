@@ -59,12 +59,12 @@ service cloud.firestore {
 
     // ── Tenant registry (superadmin writes, owners read own) ─────────────
 
-    match /tenants/{tenantId} {
-      allow get:    if isSuperAdmin() || (signedIn() && tenantId() == tenantId);
+    match /tenants/{tid} {
+      allow get:    if isSuperAdmin() || (signedIn() && tenantId() == tid);
       allow list:   if isSuperAdmin();
       allow create: if isSuperAdmin();      // only SA creates tenant docs
       allow update: if isSuperAdmin()
-                    || (isTenantOwner(tenantId)
+                    || (isTenantOwner(tid)
                         && !request.resource.data.diff(resource.data)
                             .affectedKeys().hasAny([
                               'subscriptionStatus','plan','approvedAt',
@@ -89,18 +89,19 @@ service cloud.firestore {
 
     // ── Tenant sub-collections ────────────────────────────────────────────
 
-    match /tenants/{tenantId}/{collection}/{docId} {
+    match /tenants/{tid}/{collection}/{docId} {
 
       // Parking Lots
       match /parkingLots/{lotId} {
-        allow read:   if isSuperAdmin() || isTenantStaff(tenantId) || isCustomer();
-        allow create: if isTenantOwner(tenantId);
-        allow update: if isTenantOwner(tenantId);
-        allow delete: if isTenantOwner(tenantId);
+        allow get:    if isSuperAdmin() || isTenantStaff(tid) || isCustomer();
+        allow list:   if isSuperAdmin() || isTenantStaff(tid);
+        allow create: if isTenantOwner(tid);
+        allow update: if isTenantOwner(tid);
+        allow delete: if isTenantOwner(tid);
 
         // Slots sub-collection (only for slot_based lots)
         match /slots/{slotId} {
-          allow read:  if isSuperAdmin() || isTenantStaff(tenantId) || isCustomer();
+          allow read:  if isSuperAdmin() || isTenantStaff(tid) || isCustomer();
           allow write: if false;   // only Cloud Functions write slots
         }
       }
@@ -109,8 +110,8 @@ service cloud.firestore {
       match /sessions/{sessionId} {
         allow read:
           if isSuperAdmin()
-          || isTenantOwner(tenantId)
-          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid())
+          || isTenantOwner(tid)
+          || (isTenantAttendant(tid) && resource.data.attendantId == uid())
           || (isCustomer() && resource.data.customerId == uid());
         allow write: if false;   // Cloud Functions only
       }
@@ -119,10 +120,10 @@ service cloud.firestore {
       match /transactions/{txnId} {
         allow read:
           if isSuperAdmin()
-          || isTenantOwner(tenantId)
-          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid())
+          || isTenantOwner(tid)
+          || (isTenantAttendant(tid) && resource.data.attendantId == uid())
           || (isCustomer() && resource.data.customerId == uid());
-        allow create: if isTenantAttendant(tenantId);
+        allow create: if isTenantAttendant(tid);
         allow update, delete: if false;   // IMMUTABLE
       }
 
@@ -130,11 +131,11 @@ service cloud.firestore {
       match /shifts/{shiftId} {
         allow read:
           if isSuperAdmin()
-          || isTenantOwner(tenantId)
-          || (isTenantAttendant(tenantId) && resource.data.attendantId == uid());
-        allow create: if isTenantAttendant(tenantId);
+          || isTenantOwner(tid)
+          || (isTenantAttendant(tid) && resource.data.attendantId == uid());
+        allow create: if isTenantAttendant(tid);
         allow update:
-          if isTenantAttendant(tenantId)
+          if isTenantAttendant(tid)
           && resource.data.attendantId == uid()
           && resource.data.status == 'active';
         allow delete: if false;
@@ -142,19 +143,19 @@ service cloud.firestore {
 
       // Anomalies — written by Cloud Functions, read by owner
       match /anomalies/{anomalyId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow read:  if isSuperAdmin() || isTenantOwner(tid);
         allow write: if false;
       }
 
       // Reports
       match /reports/{reportId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow read:  if isSuperAdmin() || isTenantOwner(tid);
         allow write: if false;
       }
 
       // Subscription / billing info
       match /subscription/{docId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tenantId);
+        allow read:  if isSuperAdmin() || isTenantOwner(tid);
         allow write: if isSuperAdmin();
       }
     }
