@@ -1,168 +1,85 @@
 rules_version = '2';
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  ParkSmart — Firestore Security Rules  (Multi-Tenant)
-//
-//  Tenant data lives under:  tenants/{tenantId}/...
-//  Platform data lives at:   _platform/...
-//
-//  Roles (set as Firebase Custom Claims):
-//    superadmin  — utilzone platform admin (full access)
-//    owner       — parking lot owner (scoped to their tenantId)
-//    attendant   — parking staff (scoped to tenantId + assignedLotId)
-//    customer    — vehicle owner (own sessions only)
-// ─────────────────────────────────────────────────────────────────────────────
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    function signedIn()     { return request.auth != null; }
+    function uid()          { return request.auth.uid; }
+    function role()         { return request.auth.token.role; }
+    function userTenantId() { return request.auth.token.tenantId; }
 
-    function signedIn()      { return request.auth != null; }
-    function uid()           { return request.auth.uid; }
-    function claims()        { return request.auth.token; }
-    function role()          { return claims().role; }
-    function tenantId()      { return claims().tenantId; }
+    function isSuperAdmin() { return signedIn() && role() == 'superadmin'; }
+    function isOwner()      { return signedIn() && role() == 'owner'; }
+    function isAttendant()  { return signedIn() && role() == 'attendant'; }
 
-    function isSuperAdmin()  { return signedIn() && role() == 'superadmin'; }
-    function isOwner()       { return signedIn() && role() == 'owner'; }
-    function isAttendant()   { return signedIn() && role() == 'attendant'; }
-    function isCustomer()    { return signedIn() && role() == 'customer'; }
-
-    // Owner or attendant belonging to this tenant
-    function isTenantStaff(tid) {
-      return signedIn() && tenantId() == tid && (role() == 'owner' || role() == 'attendant');
-    }
-
-    function isTenantOwner(tid) {
-      return signedIn() && role() == 'owner' && tenantId() == tid;
-    }
-
-    function isTenantAttendant(tid) {
-      return signedIn() && role() == 'attendant' && tenantId() == tid;
-    }
-
-    // ── Platform-level collections (superadmin only) ──────────────────────
-
-    match /_platform/{doc} {
+    // ── Platform (superadmin only) ────────────────────────────────────────
+    match /_platform/{doc=**} {
       allow read, write: if isSuperAdmin();
     }
 
-    match /_platform/stats/{any=**} {
-      allow read, write: if isSuperAdmin();
+    // ── Counters (functions only) ─────────────────────────────────────────
+    match /_counters/{doc} {
+      allow read, write: if false;
     }
 
-    match /_platform/announcements/{docId} {
-      allow read:  if signedIn();   // all users can read global announcements
-      allow write: if isSuperAdmin();
-    }
-
-    // ── Tenant registry (superadmin writes, owners read own) ─────────────
-
-    match /tenants/{tid} {
-      allow get:    if isSuperAdmin() || (signedIn() && tenantId() == tid);
-      allow list:   if isSuperAdmin();
-      allow create: if isSuperAdmin();      // only SA creates tenant docs
-      allow update: if isSuperAdmin()
-                    || (isTenantOwner(tid)
-                        && !request.resource.data.diff(resource.data)
-                            .affectedKeys().hasAny([
-                              'subscriptionStatus','plan','approvedAt',
-                              'suspendedAt','ownerUid'
-                            ]));            // owner cannot change billing fields
-      allow delete: if isSuperAdmin();
-    }
-
-    // ── Users (global collection — UID keyed) ────────────────────────────
-
+    // ── Users ─────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow get:    if isSuperAdmin()
-                    || (signedIn() && uid() == userId)
-                    || (isOwner() && resource.data.tenantId == tenantId());
-      allow list:   if isSuperAdmin() || isOwner();
-      allow create: if signedIn() && uid() == userId;
-      allow update: if signedIn() && uid() == userId
-                    && !request.resource.data.diff(resource.data)
-                        .affectedKeys().hasAny(['role','tenantId','assignedLotIds']);
-      allow delete: if isSuperAdmin();
+      allow read:   if signedIn() && (isSuperAdmin() || uid() == userId || isOwner());
+      allow write:  if signedIn() && (isSuperAdmin() || uid() == userId);
     }
 
-    // ── Tenant sub-collections ────────────────────────────────────────────
+    // ── Tenants ───────────────────────────────────────────────────────────
+    match /tenants/{tid} {
+      allow read:   if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+      allow list:   if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isOwner() && userTenantId() == tid);
+      allow delete: if isSuperAdmin();
 
-    match /tenants/{tid}/{collection}/{docId} {
-
-      // Parking Lots
+      // ── Parking Lots ───────────────────────────────────────────────────
       match /parkingLots/{lotId} {
-        allow get:    if isSuperAdmin() || isTenantStaff(tid) || isCustomer();
-        allow list:   if isSuperAdmin() || isTenantStaff(tid);
-        allow create: if isTenantOwner(tid);
-        allow update: if isTenantOwner(tid);
-        allow delete: if isTenantOwner(tid);
+        allow read:   if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+        allow write:  if signedIn() && (isSuperAdmin() || (isOwner() && userTenantId() == tid));
 
-        // Slots sub-collection (only for slot_based lots)
         match /slots/{slotId} {
-          allow read:  if isSuperAdmin() || isTenantStaff(tid) || isCustomer();
-          allow write: if false;   // only Cloud Functions write slots
+          allow read:  if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+          allow write: if false;
         }
       }
 
-      // Sessions — immutable after creation, written by Cloud Functions
+      // ── Sessions ───────────────────────────────────────────────────────
       match /sessions/{sessionId} {
-        allow read:
-          if isSuperAdmin()
-          || isTenantOwner(tid)
-          || (isTenantAttendant(tid) && resource.data.attendantId == uid())
-          || (isCustomer() && resource.data.customerId == uid());
-        allow write: if false;   // Cloud Functions only
+        allow read:  if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+        allow write: if false;
       }
 
-      // Transactions — create once, never update/delete
+      // ── Transactions ───────────────────────────────────────────────────
       match /transactions/{txnId} {
-        allow read:
-          if isSuperAdmin()
-          || isTenantOwner(tid)
-          || (isTenantAttendant(tid) && resource.data.attendantId == uid())
-          || (isCustomer() && resource.data.customerId == uid());
-        allow create: if isTenantAttendant(tid);
-        allow update, delete: if false;   // IMMUTABLE
+        allow read:   if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+        allow create: if signedIn() && isAttendant() && userTenantId() == tid;
+        allow update, delete: if false;
       }
 
-      // Shifts
+      // ── Shifts ─────────────────────────────────────────────────────────
       match /shifts/{shiftId} {
-        allow read:
-          if isSuperAdmin()
-          || isTenantOwner(tid)
-          || (isTenantAttendant(tid) && resource.data.attendantId == uid());
-        allow create: if isTenantAttendant(tid);
-        allow update:
-          if isTenantAttendant(tid)
-          && resource.data.attendantId == uid()
-          && resource.data.status == 'active';
+        allow read:   if signedIn() && (isSuperAdmin() || userTenantId() == tid);
+        allow create: if signedIn() && isAttendant() && userTenantId() == tid;
+        allow update: if signedIn() && isAttendant() && userTenantId() == tid;
         allow delete: if false;
       }
 
-      // Anomalies — written by Cloud Functions, read by owner
-      match /anomalies/{anomalyId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tid);
+      // ── Anomalies, Reports, Subscription ──────────────────────────────
+      match /anomalies/{docId} {
+        allow read:  if signedIn() && (isSuperAdmin() || userTenantId() == tid);
         allow write: if false;
       }
-
-      // Reports
-      match /reports/{reportId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tid);
+      match /reports/{docId} {
+        allow read:  if signedIn() && (isSuperAdmin() || userTenantId() == tid);
         allow write: if false;
       }
-
-      // Subscription / billing info
       match /subscription/{docId} {
-        allow read:  if isSuperAdmin() || isTenantOwner(tid);
+        allow read:  if signedIn() && (isSuperAdmin() || userTenantId() == tid);
         allow write: if isSuperAdmin();
       }
-    }
-
-    // ── Token counter (per tenant, per lot) ───────────────────────────────
-    match /_counters/{counterId} {
-      allow read, write: if false;   // Cloud Functions only
     }
   }
 }
