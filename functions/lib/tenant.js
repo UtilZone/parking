@@ -42,8 +42,8 @@ const admin = __importStar(require("firebase-admin"));
 const logger = __importStar(require("firebase-functions/logger"));
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
-const db = admin.firestore();
-const messaging = admin.messaging();
+const getDb = () => admin.firestore();
+const getMsg = () => admin.messaging();
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function assertSuperAdmin(auth) {
     if (!auth || auth.token.role !== 'superadmin') {
@@ -52,7 +52,7 @@ function assertSuperAdmin(auth) {
 }
 async function sendFcm(token, title, body, data) {
     try {
-        await messaging.send({ token, notification: { title, body }, data });
+        await getMsg().send({ token, notification: { title, body }, data });
     }
     catch (e) {
         logger.warn('FCM failed', { token: token.slice(0, 10), e });
@@ -60,7 +60,7 @@ async function sendFcm(token, title, body, data) {
 }
 async function notifyOwner(ownerUid, title, body, data) {
     var _a;
-    const userDoc = await db.collection('users').doc(ownerUid).get();
+    const userDoc = await getDb().collection('users').doc(ownerUid).get();
     const token = (_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmToken;
     if (token)
         await sendFcm(token, title, body, data);
@@ -75,12 +75,12 @@ exports.registerTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (r
         throw new https_1.HttpsError('invalid-argument', 'businessName, ownerName, phone are required.');
     }
     // Check this user doesn't already have a tenant
-    const existing = await db.collection('tenants')
+    const existing = await getDb().collection('tenants')
         .where('ownerUid', '==', req.auth.uid).limit(1).get();
     if (!existing.empty) {
         throw new https_1.HttpsError('already-exists', 'You already have a registered business.');
     }
-    const tenantRef = db.collection('tenants').doc();
+    const tenantRef = getDb().collection('tenants').doc();
     const now = firestore_1.Timestamp.now();
     // Trial plan auto-assigned, pending approval
     const trialEnd = new Date();
@@ -101,7 +101,7 @@ exports.registerTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (r
         createdAt: now,
     });
     // Update user profile with tenantId and role
-    await db.collection('users').doc(req.auth.uid).set({
+    await getDb().collection('users').doc(req.auth.uid).set({
         uid: req.auth.uid,
         name: ownerName,
         phone,
@@ -117,7 +117,7 @@ exports.registerTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (r
         tenantId: tenantRef.id,
     });
     // Alert superadmins via Firestore (they'll see it in their panel)
-    await db.collection('_platform').doc('pendingApprovals').set({
+    await getDb().collection('_platform').doc('pendingApprovals').set({
         [`tenant_${tenantRef.id}`]: {
             tenantId: tenantRef.id,
             businessName,
@@ -134,7 +134,7 @@ exports.approveTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (re
     const { tenantId, plan } = req.data;
     if (!tenantId)
         throw new https_1.HttpsError('invalid-argument', 'tenantId required.');
-    const tenantRef = db.collection('tenants').doc(tenantId);
+    const tenantRef = getDb().collection('tenants').doc(tenantId);
     const tenantDoc = await tenantRef.get();
     if (!tenantDoc.exists)
         throw new https_1.HttpsError('not-found', 'Tenant not found.');
@@ -149,7 +149,7 @@ exports.approveTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (re
     // Notify owner
     await notifyOwner(tenant.ownerUid, '🎉 Account Approved!', `Your ParkSmart account for "${tenant.businessName}" has been approved. You can now add parking lots.`, { tenantId, action: 'approved' });
     // Clean up pending list
-    await db.collection('_platform').doc('pendingApprovals').update({
+    await getDb().collection('_platform').doc('pendingApprovals').update({
         [`tenant_${tenantId}`]: admin.firestore.FieldValue.delete()
     });
     logger.info('Tenant approved', { tenantId, by: req.auth.uid });
@@ -161,7 +161,7 @@ exports.suspendTenant = (0, https_1.onCall)({ region: 'asia-south1' }, async (re
     const { tenantId, reason } = req.data;
     if (!tenantId)
         throw new https_1.HttpsError('invalid-argument', 'tenantId required.');
-    const tenantRef = db.collection('tenants').doc(tenantId);
+    const tenantRef = getDb().collection('tenants').doc(tenantId);
     const tenantDoc = await tenantRef.get();
     if (!tenantDoc.exists)
         throw new https_1.HttpsError('not-found', 'Tenant not found.');
@@ -194,7 +194,7 @@ exports.assignRole = (0, https_1.onCall)({ region: 'asia-south1' }, async (req) 
         throw new https_1.HttpsError('invalid-argument', `Invalid role: ${role}`);
     }
     await admin.auth().setCustomUserClaims(targetUid, { role, tenantId });
-    await db.collection('users').doc(targetUid).update({
+    await getDb().collection('users').doc(targetUid).update({
         role,
         tenantId,
         assignedLotIds: assignedLotIds || [],
@@ -209,7 +209,7 @@ exports.pushAnnouncement = (0, https_1.onCall)({ region: 'asia-south1' }, async 
     if (!title || !body)
         throw new https_1.HttpsError('invalid-argument', 'title and body required.');
     const now = firestore_1.Timestamp.now();
-    const announRef = db.collection('_platform').doc('data')
+    const announRef = getDb().collection('_platform').doc('data')
         .collection('announcements').doc();
     const expiresAt = expiresInDays
         ? firestore_1.Timestamp.fromMillis(Date.now() + expiresInDays * 86400000)
@@ -217,7 +217,7 @@ exports.pushAnnouncement = (0, https_1.onCall)({ region: 'asia-south1' }, async 
     await announRef.set(Object.assign({ announcementId: announRef.id, title, body, targetRoles: targetRoles || ['owner', 'attendant'], isPinned: isPinned || false, createdAt: now }, (expiresAt && { expiresAt })));
     // FCM topic push (all users subscribed to 'all_users' topic at login)
     try {
-        await messaging.sendToTopic('all_users', {
+        await getMsg().sendToTopic('all_users', {
             notification: { title, body },
             data: { announcementId: announRef.id, type: 'announcement' },
         });
@@ -232,8 +232,8 @@ exports.pushAnnouncement = (0, https_1.onCall)({ region: 'asia-south1' }, async 
 exports.getPlatformStats = (0, https_1.onCall)({ region: 'asia-south1' }, async (req) => {
     assertSuperAdmin(req.auth);
     const [tenantsSnap, usersSnap] = await Promise.all([
-        db.collection('tenants').get(),
-        db.collection('users').where('role', '==', 'owner').get(),
+        getDb().collection('tenants').get(),
+        getDb().collection('users').where('role', '==', 'owner').get(),
     ]);
     const tenants = tenantsSnap.docs.map(d => d.data());
     const byStatus = tenants.reduce((acc, t) => {
@@ -290,7 +290,7 @@ exports.createAttendant = (0, https_1.onCall)({ region: 'asia-south1' }, async (
         tenantId,
     });
     // Create Firestore user document
-    await db.collection('users').doc(userRecord.uid).set({
+    await getDb().collection('users').doc(userRecord.uid).set({
         uid: userRecord.uid,
         name,
         email,
