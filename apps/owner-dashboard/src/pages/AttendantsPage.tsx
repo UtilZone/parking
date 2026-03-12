@@ -89,6 +89,7 @@ export default function AttendantsPage({ tenantId }: Props) {
       setInvName(''); setInvEmail(''); setInvPassword(''); setInvPhone(''); setInvLots([]);
     } catch (e: any) {
       flash(`❌ ${e.message}`);
+      setShowInvite(false);
     } finally { setInviting(false); }
   };
 
@@ -195,8 +196,8 @@ export default function AttendantsPage({ tenantId }: Props) {
 
       {/* Add attendant modal */}
       {showInvite && (
-        <div style={css.overlay}>
-          <div style={css.modal}>
+        <div style={css.overlay} onClick={() => setShowInvite(false)}>
+          <div style={css.modal} onClick={e => e.stopPropagation()}>
             <div style={css.modalHeader}>
               <h2 style={css.modalTitle}>+ Add Attendant</h2>
               <button style={css.closeBtn} onClick={() => setShowInvite(false)}>✕</button>
