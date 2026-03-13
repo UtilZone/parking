@@ -238,6 +238,7 @@ export default function OwnerDashboardPage({ tenantId }: Props) {
         {/* ── Revenue chart ──────────────────────────────────────────── */}
         <div style={css.card}>
           <div style={css.cardTitle}>Revenue — Last 8 Hours</div>
+          <div style={{ height: 160, width: "100%", overflow: "hidden" }}>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={hourlyData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
@@ -250,6 +251,7 @@ export default function OwnerDashboardPage({ tenantId }: Props) {
               <Bar dataKey="amount" fill="#F59E0B" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
 
         {/* ── Anomalies ──────────────────────────────────────────────── */}
@@ -313,7 +315,7 @@ export default function OwnerDashboardPage({ tenantId }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const css: Record<string, React.CSSProperties> = {
-  page:      { padding: 24, background: '#0A0E1A', minHeight: '100vh',
+  page:      { padding: 24, background: '#0A0E1A',
                fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#F0F4FF' },
 
   locBar:    { marginBottom: 24 },

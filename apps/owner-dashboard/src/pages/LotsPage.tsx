@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   collection, query, onSnapshot, doc,
   addDoc, updateDoc, deleteDoc, writeBatch, Timestamp,
@@ -214,9 +215,9 @@ export default function LotsPage({ tenantId }: Props) {
       </div>
 
       {/* Edit / Create modal */}
-      {editing && (
-        <div style={css.overlay}>
-          <div style={css.modal}>
+      {editing && createPortal(
+        <div style={css.overlay} onClick={() => { setEditing(null); setIsNew(false); }}>
+          <div style={css.modal} onClick={e => e.stopPropagation()}>
             <div style={css.modalHeader}>
               <h2 style={css.modalTitle}>{isNew ? '+ New Parking Location' : 'Edit Lot'}</h2>
               <button style={css.closeBtn} onClick={() => setEditing(null)}>✕</button>
@@ -306,12 +307,12 @@ export default function LotsPage({ tenantId }: Props) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* Slot management modal */}
-      {showSlots && (
-        <div style={css.overlay}>
-          <div style={{ ...css.modal, maxWidth: 440 }}>
+      {showSlots && createPortal(
+        <div style={css.overlay} onClick={() => setShowSlots(false)}>
+          <div style={{ ...css.modal, maxWidth: 440 }} onClick={e => e.stopPropagation()}>
             <div style={css.modalHeader}>
               <h2 style={css.modalTitle}>🔢 Add Slots in Bulk</h2>
               <button style={css.closeBtn} onClick={() => setShowSlots(false)}>✕</button>
@@ -359,7 +360,7 @@ export default function LotsPage({ tenantId }: Props) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
@@ -383,7 +384,7 @@ function FNum({ label, val, set }: { label: string; val: number; set: (v: number
 }
 
 const css: Record<string, React.CSSProperties> = {
-  page:     { padding: 28, background: '#0A0E1A', minHeight: '100vh',
+  page:     { padding: 28, background: '#0A0E1A', minHeight: 'unset',
               fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: '#F0F4FF' },
   header:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title:    { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: 0 },

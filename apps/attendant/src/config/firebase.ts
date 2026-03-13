@@ -14,7 +14,7 @@ const firebaseConfig = {
   projectId:         "utilzone-parking",
   storageBucket:     "utilzone-parking.appspot.com",
   messagingSenderId: "1074471029697",
-  appId:             "1:1074471029697:web:cccd5913a2c3db2271bd40",
+  appId:             "1:1074471029697:android:e075094d49d0153b71bd40",
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];

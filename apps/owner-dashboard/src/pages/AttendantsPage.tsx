@@ -4,7 +4,8 @@
  * Attendants join via phone OTP; owner assigns role + lots here.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   collection, query, where, onSnapshot, doc,
   updateDoc,
@@ -47,7 +48,13 @@ export default function AttendantsPage({ tenantId }: Props) {
   const [editLots,   setEditLots]   = useState<string[]>([]);
   const [saving,     setSaving]     = useState(false);
 
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3500); };
+  const flashTimer = useRef<any>(null);
+  const flash = useCallback((m: string) => {
+    setMsg(m);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setMsg(''), 3500);
+  }, []);
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
   useEffect(() => {
     const q = query(
@@ -84,13 +91,15 @@ export default function AttendantsPage({ tenantId }: Props) {
         phone: invPhone ? `+91${invPhone.replace(/\D/g, '')}` : '',
         assignedLotIds: invLots,
       });
-      flash(`✅ ${invName} added. They can log in with ${invEmail} on the Attendant app.`);
       setShowInvite(false);
       setInvName(''); setInvEmail(''); setInvPassword(''); setInvPhone(''); setInvLots([]);
+      setInviting(false);
+      flash(`✅ ${invName} added. They can log in with ${invEmail} on the Attendant app.`);
     } catch (e: any) {
-      flash(`❌ ${e.message}`);
       setShowInvite(false);
-    } finally { setInviting(false); }
+      setInviting(false);
+      flash(`❌ ${e.message}`);
+    } finally {}
   };
 
   // ── Save lot assignments ─────────────────────────────────────────────────
@@ -195,7 +204,7 @@ export default function AttendantsPage({ tenantId }: Props) {
       )}
 
       {/* Add attendant modal */}
-      {showInvite && (
+      {showInvite && createPortal(
         <div style={css.overlay} onClick={() => setShowInvite(false)}>
           <div style={css.modal} onClick={e => e.stopPropagation()}>
             <div style={css.modalHeader}>
@@ -246,12 +255,12 @@ export default function AttendantsPage({ tenantId }: Props) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* Assign lots modal */}
-      {editing && (
-        <div style={css.overlay}>
-          <div style={{ ...css.modal, maxWidth: 440 }}>
+      {editing && createPortal(
+        <div style={css.overlay} onClick={() => setEditing(null)}>
+          <div style={{ ...css.modal, maxWidth: 440 }} onClick={e => e.stopPropagation()}>
             <div style={css.modalHeader}>
               <h2 style={css.modalTitle}>Assign Lots — {editing.name}</h2>
               <button style={css.closeBtn} onClick={() => setEditing(null)}>✕</button>
@@ -277,7 +286,7 @@ export default function AttendantsPage({ tenantId }: Props) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }
@@ -287,7 +296,7 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 const css: Record<string, React.CSSProperties> = {
-  page:     { padding: 28, background: '#0A0E1A', minHeight: '100vh',
+  page:     { padding: 28, background: '#0A0E1A', minHeight: 'unset',
               fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: '#F0F4FF' },
   header:   { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   title:    { fontSize: 22, fontWeight: 800, margin: 0 },

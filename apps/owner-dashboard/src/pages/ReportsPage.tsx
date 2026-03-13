@@ -160,6 +160,7 @@ export default function ReportsPage({ tenantId }: Props) {
             {/* Payment method breakdown - pie */}
             <div style={css.chartCard}>
               <div style={css.chartTitle}>Payment Method Breakdown</div>
+              <div style={{ height: 220, overflow: "hidden" }}>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
@@ -169,11 +170,13 @@ export default function ReportsPage({ tenantId }: Props) {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
+              </div>
             </div>
 
             {/* Revenue by method - bar */}
             <div style={css.chartCard}>
               <div style={css.chartTitle}>Revenue by Payment Method</div>
+              <div style={{ height: 220, overflow: "hidden" }}>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={pieData} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
@@ -185,6 +188,7 @@ export default function ReportsPage({ tenantId }: Props) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
@@ -236,7 +240,7 @@ export default function ReportsPage({ tenantId }: Props) {
 }
 
 const css: Record<string, React.CSSProperties> = {
-  page:     { padding: 28, background: '#0A0E1A', minHeight: '100vh',
+  page:     { padding: 28, background: '#0A0E1A', minHeight: 'unset',
               fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", color: '#F0F4FF' },
   title:    { fontSize: 22, fontWeight: 800, marginBottom: 24, letterSpacing: -0.5, margin: '0 0 24px' },
   filterCard: { background: '#131B2A', border: '1px solid #1E2D45', borderRadius: 16,
